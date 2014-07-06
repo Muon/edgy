@@ -49,4 +49,55 @@ PenMorph.prototype.drawNew = function (facing) {
     SymbolMorph.prototype.drawSymbolTurtle(this.image, this.color.toString());
 };
 
+BlockMorph.prototype.userMenu = (function userMenu(oldUserMenu) {
+    return function() {
+        var menu = oldUserMenu.call(this);
+        menu.addItem("execute remotely", 'executeRemotely');
+        return menu;
+    };
+}(BlockMorph.prototype.userMenu));
+
+BlockMorph.prototype.executeRemotely = function() {
+    var myself = this;
+    var POLL_WAIT = 1000;
+
+    var ide = this.parentThatIsA(IDE_Morph);
+    var xml = ide.serializer.serialize(ide.stage);
+    var spriteIdx = ide.stage.children.indexOf(this.parent.owner);
+    var blockIdx = this.parent.children.indexOf(this);
+    $.post(ide.remoteExecutionURL + '/jobs', JSON.stringify({
+        sprite_idx: spriteIdx,
+        block_idx: blockIdx,
+        project: xml
+    }), function(response, status, xhr) {
+        var jobId = response.id;
+        function pollServer() {
+            $.get(ide.remoteExecutionURL + '/jobs/' + jobId, function(response, status, xhr) {
+                console.log(response);
+                var state = response.state;
+                if(state == "finished") {
+                    // Success! Fetch the result.
+                    $.get(ide.remoteExecutionURL + '/jobs/' + jobId + '/result', function(response, status, xhr) {
+                        console.log(response);
+                        var value = response;
+                        if (myself instanceof ReporterBlockMorph) {
+                            if($.isArray(value)) {
+                                myself.showBubble(new ListWatcherMorph(new List(value)));
+                            } else {
+                                myself.showBubble(value);
+                            }
+                        }
+                    });
+                } else if(state == "error") {
+                    // We died horribly, but Snappy does not have a way of
+                    // telling us how we died, yet.
+                } else {
+                    setTimeout(pollServer, POLL_WAIT);
+                }
+            });
+        }
+        pollServer();
+    });
+};
+
 }());

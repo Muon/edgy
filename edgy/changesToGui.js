@@ -12,6 +12,7 @@ IDE_Morph.prototype.init = (function init (oldInit) {
         var retval = oldInit.call(this, isAutoFill);
         this.currentCategory = 'network';
         this.maxVisibleNodes = DEFAULT_MAX_VISIBLE_NODES;
+        this.remoteExecutionURL = 'http://localhost:8888';
         return retval;
     }
 }(IDE_Morph.prototype.init));
